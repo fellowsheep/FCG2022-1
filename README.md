@@ -1,7 +1,7 @@
 # FCG2022-1
 Alguns projetos desenvolvidos para as aulas de Fundamentos de Computacão Gráfica do curso de Jogos Digitais da Unisinos
 
-As dependências estão pré-compiladas para Windows 10 32-bits e compilador do Visual Studio 2019
+As dependências estão pré-compiladas para Windows 10 32-bits e compilador do Visual Studio 2019/2022
 Se o seu ambiente de desenvolvimento for diferente, você deve baixar:
 
 - GLFW: https://www.glfw.org/
