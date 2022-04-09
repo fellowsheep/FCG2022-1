@@ -3,7 +3,7 @@
  * Adaptado por Rossana Baptista Queiroz
  * para a disciplina de Processamento Gráfico - Jogos Digitais - Unisinos
  * Versão inicial: 7/4/2017
- * Última atualização em 05/03/2022
+ * Última atualização em 09/04/2022
  *
  */
 
@@ -31,14 +31,27 @@ const float Pi = 3.14159;
 
 // Protótipo da função de callback de teclado
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
+void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 
 // Protótipos das funções
 int setupGeometry();
 int createCircle(float radius, int nPoints);
 int setupGeometry3D();
+void updateCameraPos(GLFWwindow* window);
 
 // Dimensões da janela (pode ser alterado em tempo de execução)
 const GLuint WIDTH = 600, HEIGHT = 600;
+int viewID = 1;
+
+//Variáveis de controle da câmera
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f); 
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+bool firstMouse = true;
+float lastX = WIDTH / 2.0, lastY = HEIGHT / 2.0; //para calcular o quanto que o mouse deslocou
+float yaw = -90.0, pitch = 0.0; //rotação em x e y
+
+
 
 // Função MAIN
 int main()
@@ -59,12 +72,17 @@ int main()
 //	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 //#endif
 
+
 	// Criação da janela GLFW
 	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Ola Piramide!", nullptr, nullptr);
 	glfwMakeContextCurrent(window);
 
 	// Fazendo o registro da função de callback para a janela GLFW
 	glfwSetKeyCallback(window, key_callback);
+	glfwSetCursorPosCallback(window, mouse_callback);
+
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
 
 	// GLAD: carrega todos os ponteiros d funções da OpenGL
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -88,13 +106,17 @@ int main()
 	
 	glUseProgram(shader.ID);
 	
+	//Matriz de view
+	glm::mat4 view = glm::mat4(1);
+	view = glm::lookAt(cameraPos, glm::vec3(0.0, 0.0, 0.0) + cameraFront, cameraUp);
+	shader.setMat4("view", glm::value_ptr(view));
+
 	//Matriz de projeção
 	glm::mat4 projection = glm::mat4(1); //matriz identidade
-	projection = glm::ortho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
-
-	GLint projLoc = glGetUniformLocation(shader.ID, "projection");
-	glUniformMatrix4fv(projLoc, 1, FALSE, glm::value_ptr(projection));
-
+	projection = glm::perspective(45.0f, (GLfloat)WIDTH / (GLfloat)HEIGHT, 0.1f,100.0f);
+	shader.setMat4("projection", glm::value_ptr(projection));
+	
+	//Habilita teste de profundidade
 	glEnable(GL_DEPTH_TEST);
 
 	// Loop da aplicação - "game loop"
@@ -102,22 +124,64 @@ int main()
 	{
 		// Checa se houveram eventos de input (key pressed, mouse moved etc.) e chama as funções de callback correspondentes
 		glfwPollEvents();
+		//Antigo "processInput" -- a ideia é que vire método da classe Camera futuramente
+		updateCameraPos(window);
 
 		// Definindo as dimensões da viewport com as mesmas dimensões da janela da aplicação
 		int width, height;
 		glfwGetFramebufferSize(window, &width, &height);
 		glViewport(0, 0, width, height);
 
-		// Limpa o buffer de cor
+		// Limpa o buffer de cor e de profundidade
 		glClearColor(0.8f, 0.8f, 0.8f, 1.0f); //cor de fundo
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glLineWidth(10);
 		glPointSize(20);
 
+
+		//Para acionar as múltiplas views
+		switch (viewID)
+		{
+		case 1:
+			cameraPos = glm::vec3(0.0, 0.0, 3.0);
+			cameraFront = glm::vec3(0.0, 0.0, -1.0);
+			cameraUp = glm::vec3(0.0, 1.0, 0.0);
+			viewID = -1;
+			break;
+		case 2:
+			cameraPos = glm::vec3(0.0, 0.0, -3.0);
+			cameraFront = glm::vec3(0.0, 0.0, 1.0);
+			cameraUp = glm::vec3(0.0, 1.0, 0.0);
+			viewID = -1;
+			break;
+		case 3:
+			cameraPos = glm::vec3(-3.0, 0.0, 0.0);
+			cameraFront = glm::vec3(1.0, 0.0, 0.0);
+			cameraUp = glm::vec3(0.0, 1.0, 0.0);
+			viewID = -1;
+			break;
+		case 4:
+			cameraPos = glm::vec3(3.0, 0.0, .0);
+			cameraFront = glm::vec3(-1.0, 0.0, 0.0);
+			cameraUp = glm::vec3(0.0, 1.0, 0.0);
+			viewID = -1;
+			break;
+		case 5:
+			cameraPos = glm::vec3(0.0, 3.0, 0.0);
+			cameraFront = glm::vec3(0.0, -1.0, 0.0);
+			cameraUp = glm::vec3(0.0, 0.0, -1.0);
+			viewID = -1;
+			break;
+		}
+
+		view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+		shader.setMat4("view", glm::value_ptr(view));
+
+
 		glm::mat4 model = glm::mat4(1); //matriz identidade é necessária
 		//model = glm::translate(model, glm::vec3(0.7, 0.0, 0.0));
-		model = glm::rotate(model, (float)glfwGetTime()/*glm::radians(45.f)*/, glm::vec3(0, 1, 0));
+		//model = glm::rotate(model, (float)glfwGetTime()/*glm::radians(45.f)*/, glm::vec3(0, 1, 0));
 		//model = glm::scale(model, glm::vec3(0.2, 0.2, 1.0));
 		GLint modelLoc = glGetUniformLocation(shader.ID, "model");
 		glUniformMatrix4fv(modelLoc, 1, FALSE, glm::value_ptr(model));
@@ -156,6 +220,33 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 {
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, GL_TRUE);
+
+	if (key == GLFW_KEY_1 && action == GLFW_PRESS)
+	{
+		viewID = 1; //FRENTE
+	}
+
+	if (key == GLFW_KEY_2 && action == GLFW_PRESS)
+	{
+		viewID = 2; //TRÁS
+	}
+
+	if (key == GLFW_KEY_3 && action == GLFW_PRESS)
+	{
+		viewID = 3; //ESQUERDA
+	}
+
+	if (key == GLFW_KEY_4 && action == GLFW_PRESS)
+	{
+		viewID = 4; //DIREITA
+	}
+
+	if (key == GLFW_KEY_5 && action == GLFW_PRESS)
+	{
+		viewID = 5; //TOPO
+	}
+
+
 }
 
 // Esta função está bastante harcoded - objetivo é criar os buffers que armazenam a 
@@ -346,4 +437,60 @@ int setupGeometry3D()
 	// Desvincula o VAO (é uma boa prática desvincular qualquer buffer ou array para evitar bugs medonhos)
 	glBindVertexArray(0);
 	return VAO;
+}
+
+void updateCameraPos(GLFWwindow* window)
+{
+	float cameraSpeed = 0.05f; // adjust accordingly
+	
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		cameraPos += cameraSpeed * cameraFront;
+
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		cameraPos -= cameraSpeed * cameraFront;
+
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+}
+
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+{
+	if (firstMouse)
+	{
+		lastX = xpos;
+		lastY = ypos;
+		firstMouse = false;
+	}
+
+	float xoffset = xpos - lastX;
+	float yoffset = lastY - ypos;
+	lastX = xpos;
+	lastY = ypos;
+
+	float sensitivity = 0.05;
+	xoffset *= sensitivity;
+	yoffset *= sensitivity;
+
+	yaw += xoffset;
+	pitch += yoffset;
+
+	if (pitch > 89.0f)
+		pitch = 89.0f;
+	if (pitch < -89.0f)
+		pitch = -89.0f;
+
+	glm::vec3 front;
+	front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+	front.y = sin(glm::radians(pitch));
+	front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+	cameraFront = glm::normalize(front);
+
+	//Precisamos também atualizar o cameraUp!! Pra isso, usamos o Up do mundo (y),
+	//Recalculamos Right e depois o Up
+	glm::vec3 right = glm::normalize(glm::cross(cameraFront, glm::vec3(0.0,1.0,0.0)));
+	cameraUp = glm::normalize(glm::cross(right, cameraFront));
+
 }
